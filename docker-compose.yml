@@ -1,0 +1,80 @@
+networks:
+  qa_net:
+  prod_net:
+
+volumes:
+  mysqldata_qa:
+  mysqldata_prod:
+
+services:
+  # ---------- QA ----------
+  db-qa:
+    image: mysql:8.0
+    container_name: mysql-simplewebapi-qa
+    environment:
+      MYSQL_ROOT_PASSWORD: "SofiCuoZZo#2025!"
+      MYSQL_DATABASE: "simpledb_qa"         # se crea sola al iniciar
+    command: --default-authentication-plugin=mysql_native_password
+    volumes:
+      - mysqldata_qa:/var/lib/mysql
+    networks:
+      - qa_net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -p$${MYSQL_ROOT_PASSWORD} || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  app-qa:
+    image: soficuozzo/simplewebapi:v1.0
+    container_name: simplewebapi-qa
+    environment:
+      ASPNETCORE_ENVIRONMENT: "QA"
+      # Connection string para MySQL:
+      # - Server=db-qa (nombre del servicio)
+      # - AllowPublicKeyRetrieval=True evita handshake fallido con MySQL 8
+      # - SslMode=None simplifica en local
+      ConnectionStrings__Default: "Server=db-qa;Port=3306;Database=simpledb_qa;User ID=root;Password=SofiCuoZZo#2025!;AllowPublicKeyRetrieval=True;SslMode=None;"
+    depends_on:
+      db-qa:
+        condition: service_healthy
+    ports:
+      - "8080:80"
+    networks:
+      - qa_net
+    restart: unless-stopped
+
+  # ---------- PROD ----------
+  db-prod:
+    image: mysql:8.0
+    container_name: mysql-simplewebapi-prod
+    environment:
+      MYSQL_ROOT_PASSWORD: "SofiCuoZZo#2025!"
+      MYSQL_DATABASE: "simpledb_prod"
+    command: --default-authentication-plugin=mysql_native_password
+    volumes:
+      - mysqldata_prod:/var/lib/mysql
+    networks:
+      - prod_net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -p$${MYSQL_ROOT_PASSWORD} || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  app-prod:
+    image: soficuozzo/simplewebapi:v1.0
+    container_name: simplewebapi-prod
+    environment:
+      ASPNETCORE_ENVIRONMENT: "Production"
+      ConnectionStrings__Default: "Server=db-prod;Port=3306;Database=simpledb_prod;User ID=root;Password=SofiCuoZZo#2025!;AllowPublicKeyRetrieval=True;SslMode=None;"
+    depends_on:
+      db-prod:
+        condition: service_healthy
+    ports:
+      - "8081:80"
+    networks:
+      - prod_net
+    restart: unless-stopped
